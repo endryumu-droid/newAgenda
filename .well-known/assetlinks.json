@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "io.github.endryumu_droid.newAgenda",
+    "sha256_cert_fingerprints": ["C3:68:08:97:97:4C:AE:8D:6A:99:0C:C9:EC:D0:1C:C4:D6:EF:49:A9:FE:3F:49:F1:C6:B2:76:23:E8:AE:AD:14"]
+  }
+}]
