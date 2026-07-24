@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>La Mia Agenda</title>
+
+<!-- ═══════════════════════════════════════════
+     PWA — Progressive Web App
+     display:standalone nasconde la barra
+     dell'indirizzo e il pulsante Condividi
+     ═══════════════════════════════════════════ -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1C2A3A">
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- iOS / Safari specifico -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Agenda">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+<!-- Splash screen colore sfondo -->
+<meta name="msapplication-TileColor" content="#1C2A3A">
+<meta name="msapplication-TileImage" content="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --cream:#F3EEE1;
+    --paper:#FBF8F1;
+    --navy:#1C2A3A;
+    --navy-soft:#2E4057;
+    --brass:#B08D57;
+    --brass-soft:#D8C39C;
+    --ink:#232323;
+    --muted:#7A7568;
+    --danger:#A5453A;
+    --ok:#4C7A5A;
+    --radius:14px;
+    --shadow: 0 2px 10px rgba(28,42,58,0.12);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Work Sans', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1,h2,h3, .display{
+    font-family:'Fraunces', serif;
+    color:var(--navy);
+    margin:0;
+  }
+  .mono{font-family:'JetBrains Mono', monospace;}
+
+  #app{
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+    max-width:520px;
+    margin:0 auto;
+    background:var(--cream);
+    position:relative;
+    overflow:hidden;
+  }
+
+  /* ---------- HEADER ---------- */
+  .topbar{
+    padding:18px 20px 12px 20px;
+    border-bottom:1px solid var(--brass-soft);
+    background:var(--paper);
+  }
+  .topbar h1{font-size:1.5rem; font-weight:600;}
+  .topbar .subtitle{font-size:0.8rem; color:var(--muted); margin-top:2px;}
+
+  /* ---------- MAIN / VIEWS ---------- */
+  main{flex:1; overflow-y:auto; position:relative;}
+  .view{display:none; padding:16px 16px 90px 16px; height:100%; overflow-y:auto;}
+  .view.active{display:block;}
+
+  /* ---------- TAB BAR ---------- */
+  .tabbar{
+    position:absolute;
+    bottom:0; left:0; right:0;
+    display:flex;
+    background:var(--navy);
+    border-top:1px solid var(--navy-soft);
+  }
+  .tabbar button{
+    flex:1;
+    background:none;
+    border:none;
+    color:#B7C2CE;
+    padding:12px 0 10px 0;
+    font-family:'Work Sans', sans-serif;
+    font-size:0.72rem;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    cursor:pointer;
+  }
+  .tabbar button .icon{font-size:1.3rem;}
+  .tabbar button.active{color:var(--brass-soft);}
+
+  /* ---------- CALENDAR ---------- */
+  .cal-switch{
+    display:flex;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .cal-switch button{
+    flex:1;
+    padding:8px 0;
+    border-radius:20px;
+    border:1px solid var(--brass-soft);
+    background:var(--paper);
+    color:var(--navy);
+    font-size:0.82rem;
+    font-family:'Work Sans', sans-serif;
+    cursor:pointer;
+  }
+  .cal-switch button.active{
+    background:var(--navy);
+    color:var(--brass-soft);
+    border-color:var(--navy);
+  }
+
+  .cal-nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:12px;
+  }
+  .cal-nav button{
+    background:var(--paper);
+    border:1px solid var(--brass-soft);
+    color:var(--navy);
+    width:34px; height:34px;
+    border-radius:50%;
+    font-size:1rem;
+    cursor:pointer;
+  }
+  .cal-nav .label{font-family:'Fraunces', serif; font-weight:600; font-size:1.05rem; color:var(--navy); text-transform:capitalize;}
+
+  /* month grid */
+  .month-grid{
+    display:grid;
+    grid-template-columns:repeat(7,1fr);
+    gap:4px;
+  }
+  .weekday-label{
+    text-align:center;
+    font-size:0.68rem;
+    color:var(--muted);
+    padding-bottom:4px;
+    text-transform:uppercase;
+  }
+  .day-cell{
+    aspect-ratio:1;
+    background:var(--paper);
+    border-radius:8px;
+    border:1px solid rgba(176,141,87,0.25);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    font-size:0.85rem;
+    cursor:pointer;
+    position:relative;
+    color:var(--ink);
+  }
+  .day-cell.empty{background:transparent; border:none; cursor:default;}
+  .day-cell.today{border:2px solid var(--brass);}
+  .day-cell.selected{background:var(--navy); color:#fff;}
+  .day-cell .dot{
+    width:5px; height:5px; border-radius:50%;
+    background:var(--danger);
+    position:absolute;
+    bottom:6px;
+  }
+  .day-cell.selected .dot{background:var(--brass-soft);}
+
+  /* agenda lists (day / week) */
+  .day-block{margin-bottom:18px;}
+  .day-block h3{
+    font-size:0.95rem;
+    border-bottom:1px solid var(--brass-soft);
+    padding-bottom:6px;
+    margin-bottom:8px;
+    text-transform:capitalize;
+  }
+  .event-card{
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+    background:var(--paper);
+    border-left:3px solid var(--brass);
+    border-radius:6px;
+    padding:8px 10px;
+    margin-bottom:6px;
+    box-shadow:var(--shadow);
+  }
+  .event-card .time{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.78rem;
+    color:var(--navy);
+    min-width:44px;
+  }
+  .event-card .title{flex:1; font-size:0.9rem;}
+  .event-card .del{
+    background:none; border:none; color:var(--muted); cursor:pointer; font-size:0.9rem;
+  }
+  .empty-hint{color:var(--muted); font-size:0.85rem; padding:10px 2px;}
+
+  .fab{
+    position:absolute;
+    right:20px;
+    bottom:88px;
+    width:52px; height:52px;
+    border-radius:50%;
+    background:var(--navy);
+    color:var(--brass-soft);
+    border:none;
+    font-size:1.6rem;
+    box-shadow:var(--shadow);
+    cursor:pointer;
+    z-index:5;
+  }
+
+  /* ---------- TODO ---------- */
+  .todo-input-row{
+    display:flex;
+    gap:6px;
+    margin-bottom:16px;
+  }
+  .todo-input-row input[type=text]{
+    flex:1;
+    padding:10px 12px;
+    border-radius:10px;
+    border:1px solid var(--brass-soft);
+    font-family:'Work Sans', sans-serif;
+    font-size:0.9rem;
+    background:var(--paper);
+  }
+  .mic-btn, .icon-btn{
+    width:42px; height:42px;
+    border-radius:10px;
+    border:1px solid var(--brass-soft);
+    background:var(--paper);
+    color:var(--navy);
+    font-size:1.1rem;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .mic-btn.recording{background:var(--danger); color:#fff; border-color:var(--danger);}
+  .add-btn{
+    background:var(--navy); color:var(--brass-soft); border:none;
+    border-radius:10px; padding:0 16px; font-size:0.9rem; cursor:pointer;
+  }
+
+  .todo-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--paper);
+    border-radius:8px;
+    padding:10px 12px;
+    margin-bottom:6px;
+    box-shadow:var(--shadow);
+  }
+  .todo-item input[type=checkbox]{width:18px; height:18px; accent-color:var(--navy);}
+  .todo-item .txt{flex:1; font-size:0.92rem;}
+  .todo-item.done .txt{text-decoration:line-through; color:var(--muted);}
+  .todo-item .del{background:none; border:none; color:var(--muted); font-size:0.95rem; cursor:pointer;}
+
+  /* ---------- PRIVATE ---------- */
+  .lock-screen{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding-top:60px;
+  }
+  .lock-screen .icon-big{font-size:2.6rem; margin-bottom:10px;}
+  .lock-screen p{color:var(--muted); font-size:0.85rem; max-width:280px; margin:6px 0 16px 0;}
+  .lock-screen input[type=password]{
+    width:100%; max-width:260px;
+    padding:12px 14px;
+    border-radius:10px;
+    border:1px solid var(--brass-soft);
+    background:var(--paper);
+    font-size:0.95rem;
+    margin-bottom:10px;
+    text-align:center;
+  }
+  .lock-screen .primary-btn{
+    background:var(--navy); color:var(--brass-soft); border:none;
+    padding:12px 26px; border-radius:10px; font-size:0.9rem; cursor:pointer;
+  }
+  .lock-error{color:var(--danger); font-size:0.82rem; min-height:18px;}
+
+  .private-toolbar{
+    display:flex;
+    gap:8px;
+    margin-bottom:10px;
+    align-items:center;
+  }
+  .private-toolbar .status{flex:1; font-size:0.75rem; color:var(--muted);}
+  textarea#private-textarea{
+    width:100%;
+    min-height:52vh;
+    padding:14px;
+    border-radius:10px;
+    border:1px solid var(--brass-soft);
+    background:var(--paper);
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.88rem;
+    line-height:1.5;
+    resize:vertical;
+  }
+
+  /* ---------- MODAL ---------- */
+  .modal-overlay{
+    position:absolute; inset:0;
+    background:rgba(28,42,58,0.55);
+    display:flex; align-items:flex-end;
+    z-index:20;
+  }
+  .modal-overlay.hidden{display:none;}
+  .modal-sheet{
+    background:var(--paper);
+    width:100%;
+    border-radius:18px 18px 0 0;
+    padding:20px;
+    box-shadow:0 -4px 20px rgba(0,0,0,0.2);
+  }
+  .modal-sheet h3{margin-bottom:14px; font-size:1.1rem;}
+  .field-label{font-size:0.75rem; color:var(--muted); margin-bottom:4px; display:block;}
+  .modal-sheet input[type=date], .modal-sheet input[type=time], .modal-sheet input[type=text]{
+    width:100%;
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid var(--brass-soft);
+    font-size:0.9rem;
+    margin-bottom:12px;
+    background:#fff;
+  }
+  .title-row{display:flex; gap:8px; align-items:flex-start;}
+  .title-row input{flex:1;}
+  .modal-actions{display:flex; gap:10px; margin-top:6px;}
+  .modal-actions button{flex:1; padding:11px 0; border-radius:10px; font-size:0.9rem; cursor:pointer;}
+  .btn-cancel{background:none; border:1px solid var(--brass-soft); color:var(--navy);}
+  .btn-save{background:var(--navy); border:none; color:var(--brass-soft);}
+
+  .mic-note{font-size:0.7rem; color:var(--muted); margin:-6px 0 12px 0;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="topbar">
+    <h1 id="section-title">La Mia Agenda</h1>
+    <div class="subtitle" id="section-subtitle">Calendario, cose da fare e note private</div>
+  </div>
+
+  <main>
+
+    <!-- ===================== CALENDARIO ===================== -->
+    <section id="calendar-section" class="view active">
+      <div class="cal-switch">
+        <button data-mode="day">Giorno</button>
+        <button data-mode="week">Settimana</button>
+        <button data-mode="month" class="active">Mese</button>
+      </div>
+
+      <div class="cal-nav">
+        <button id="cal-prev">‹</button>
+        <div class="label" id="cal-label">—</div>
+        <button id="cal-next">›</button>
+      </div>
+
+      <div id="calendar-body"></div>
+
+      <button class="fab" id="fab-add-event">+</button>
+    </section>
+
+    <!-- ===================== COSE DA FARE ===================== -->
+    <section id="todo-section" class="view">
+      <div class="todo-input-row">
+        <input type="text" id="todo-input" placeholder="Scrivi una cosa da fare…">
+        <button class="mic-btn" id="todo-mic" title="Detta a voce">🎤</button>
+        <button class="add-btn" id="todo-add">Aggiungi</button>
+      </div>
+      <div class="mic-note" id="todo-mic-note"></div>
+      <div id="todo-list"></div>
+    </section>
+
+    <!-- ===================== NOTE PRIVATE ===================== -->
+    <section id="private-section" class="view">
+
+      <div class="lock-screen" id="lock-screen">
+        <div class="icon-big">🔒</div>
+        <h3 id="lock-title">Note private</h3>
+        <p id="lock-desc">Crea una password per proteggere questa sezione. Serve a te soltanto: se la dimentichi, le note non potranno essere recuperate.</p>
+        <input type="password" id="pw-input" placeholder="Password">
+        <input type="password" id="pw-confirm" placeholder="Conferma password" style="display:none;">
+        <button class="primary-btn" id="pw-submit">Crea password</button>
+        <div class="lock-error" id="lock-error"></div>
+      </div>
+
+      <div id="private-unlocked" style="display:none;">
+        <div class="private-toolbar">
+          <span class="status" id="private-status">Salvato</span>
+          <button class="icon-btn" id="private-mic" title="Detta a voce">🎤</button>
+          <button class="icon-btn" id="private-pdf" title="Esporta in PDF">⬇︎</button>
+          <button class="icon-btn" id="private-lock" title="Blocca">🔒</button>
+        </div>
+        <textarea id="private-textarea" placeholder="Scrivi qui le tue informazioni private…"></textarea>
+        <div class="mic-note" id="private-mic-note"></div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <nav class="tabbar">
+    <button data-target="calendar-section" class="active"><span class="icon">📅</span>Agenda</button>
+    <button data-target="todo-section"><span class="icon">✓</span>Cose da fare</button>
+    <button data-target="private-section"><span class="icon">🔒</span>Private</button>
+  </nav>
+
+  <!-- ===================== MODALE NUOVO EVENTO ===================== -->
+  <div class="modal-overlay hidden" id="event-modal">
+    <div class="modal-sheet">
+      <h3>Nuovo appuntamento</h3>
+      <span class="field-label">Data</span>
+      <input type="date" id="ev-date">
+      <span class="field-label">Ora</span>
+      <input type="time" id="ev-time" value="09:00">
+      <span class="field-label">Descrizione</span>
+      <div class="title-row">
+        <input type="text" id="ev-title" placeholder="Es. Visita dal commercialista">
+        <button class="mic-btn" id="ev-mic" title="Detta a voce">🎤</button>
+      </div>
+      <div class="mic-note" id="ev-mic-note"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="ev-cancel">Annulla</button>
+        <button class="btn-save" id="ev-save">Salva</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================================
+   LA MIA AGENDA — logica applicativa
+   Tutto il codice è commentato in italiano per facilitarne la lettura.
+   ========================================================================= */
+
+/* ---------- Utility generali ---------- */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+const GIORNI = ['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato'];
+const GIORNI_BREVI = ['D','L','M','M','G','V','S'];
+const MESI = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+
+function dateKey(d){
+  // Restituisce una chiave 'YYYY-MM-DD' basata sulla data locale (non UTC)
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+/* ---------- Riconoscimento vocale (Web Speech API) ---------- */
+// Nota per Andrea: questa funzione richiede Chrome (o un motore basato su
+// Chromium) e una connessione internet attiva, perché il riconoscimento
+// avviene sui server di Google. Se il browser non la supporta, il pulsante
+// del microfono viene disabilitato con una nota esplicativa.
+const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function attachVoiceInput(buttonEl, noteEl, onResult){
+  if(!SpeechRecognitionCtor){
+    if(buttonEl) buttonEl.disabled = true;
+    if(noteEl) noteEl.textContent = 'Detta vocale non disponibile su questo browser.';
+    return;
+  }
+  let recognition = null;
+  let listening = false;
+
+  buttonEl.addEventListener('click', () => {
+    if(listening){
+      recognition.stop();
+      return;
+    }
+    recognition = new SpeechRecognitionCtor();
+    recognition.lang = 'it-IT';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      listening = true;
+      buttonEl.classList.add('recording');
+      if(noteEl) noteEl.textContent = 'In ascolto… parla ora.';
+    };
+    recognition.onresult = (event) => {
+      const testo = event.results[0][0].transcript;
+      onResult(testo);
+    };
+    recognition.onerror = (event) => {
+      if(noteEl) noteEl.textContent = 'Non ho capito, riprova (' + event.error + ').';
+    };
+    recognition.onend = () => {
+      listening = false;
+      buttonEl.classList.remove('recording');
+      if(noteEl && noteEl.textContent.startsWith('In ascolto')) noteEl.textContent = '';
+    };
+    recognition.start();
+  });
+}
+
+/* =========================================================================
+   SEZIONE 1 — CALENDARIO
+   ========================================================================= */
+
+let eventi = JSON.parse(localStorage.getItem('agenda_eventi') || '[]');
+// ogni evento: { id, date:'YYYY-MM-DD', time:'HH:MM', title }
+
+function salvaEventi(){
+  localStorage.setItem('agenda_eventi', JSON.stringify(eventi));
+}
+
+let calMode = 'month';       // 'day' | 'week' | 'month'
+let calRefDate = new Date(); // giorno di riferimento per la vista corrente
+let calSelectedDate = new Date(); // giorno selezionato (per il tasto "+")
+
+function eventiDelGiorno(d){
+  const k = dateKey(d);
+  return eventi.filter(e => e.date === k).sort((a,b) => a.time.localeCompare(b.time));
+}
+
+function renderEventCard(ev){
+  return `<div class="event-card" data-id="${ev.id}">
+    <div class="time mono">${ev.time}</div>
+    <div class="title">${escapeHtml(ev.title)}</div>
+    <button class="del" data-del-event="${ev.id}">✕</button>
+  </div>`;
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function renderCalendar(){
+  const body = $('#calendar-body');
+  const label = $('#cal-label');
+
+  if(calMode === 'month'){
+    renderMonth(body, label);
+  } else if(calMode === 'week'){
+    renderWeek(body, label);
+  } else {
+    renderDay(body, label);
+  }
+}
+
+function renderMonth(body, label){
+  const anno = calRefDate.getFullYear();
+  const mese = calRefDate.getMonth();
+  label.textContent = `${MESI[mese]} ${anno}`;
+
+  const primoGiorno = new Date(anno, mese, 1);
+  const ultimoGiorno = new Date(anno, mese+1, 0);
+  // Settimana che parte da lunedì: calcolo offset
+  let offset = primoGiorno.getDay() - 1; // 0=lunedì
+  if(offset < 0) offset = 6;
+
+  let html = '<div class="month-grid">';
+  ['L','M','M','G','V','S','D'].forEach(g => html += `<div class="weekday-label">${g}</div>`);
+
+  for(let i=0; i<offset; i++) html += `<div class="day-cell empty"></div>`;
+
+  const oggiKey = dateKey(new Date());
+  const selKey = dateKey(calSelectedDate);
+
+  for(let giorno=1; giorno<=ultimoGiorno.getDate(); giorno++){
+    const d = new Date(anno, mese, giorno);
+    const k = dateKey(d);
+    const haEventi = eventi.some(e => e.date === k);
+    let classi = 'day-cell';
+    if(k === oggiKey) classi += ' today';
+    if(k === selKey) classi += ' selected';
+    html += `<div class="${classi}" data-date="${k}">${giorno}${haEventi ? '<span class="dot"></span>' : ''}</div>`;
+  }
+  html += '</div>';
+  body.innerHTML = html;
+
+  $$('#calendar-body .day-cell[data-date]').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const [y,m,d] = cell.dataset.date.split('-').map(Number);
+      calSelectedDate = new Date(y, m-1, d);
+      calRefDate = new Date(calSelectedDate);
+      calMode = 'day';
+      setCalModeButtons();
+      renderCalendar();
+    });
+  });
+}
+
+function renderWeek(body, label){
+  // Trova il lunedì della settimana corrente
+  const d = new Date(calRefDate);
+  let offset = d.getDay() - 1;
+  if(offset < 0) offset = 6;
+  const lunedi = new Date(d);
+  lunedi.setDate(d.getDate() - offset);
+
+  const domenica = new Date(lunedi);
+  domenica.setDate(lunedi.getDate() + 6);
+  label.textContent = `${lunedi.getDate()} ${MESI[lunedi.getMonth()]} – ${domenica.getDate()} ${MESI[domenica.getMonth()]}`;
+
+  let html = '';
+  for(let i=0; i<7; i++){
+    const giorno = new Date(lunedi);
+    giorno.setDate(lunedi.getDate() + i);
+    const evs = eventiDelGiorno(giorno);
+    const titolo = `${GIORNI[giorno.getDay()]} ${giorno.getDate()}`;
+    html += `<div class="day-block" data-date="${dateKey(giorno)}">
+      <h3>${titolo}</h3>
+      ${evs.length ? evs.map(renderEventCard).join('') : '<div class="empty-hint">Nessun appuntamento</div>'}
+    </div>`;
+  }
+  body.innerHTML = html;
+  attachEventDeleteHandlers(body);
+
+  // Cliccando sull'intestazione di un giorno ci si sposta in vista "Giorno"
+  $$('#calendar-body .day-block h3').forEach(h => {
+    h.style.cursor = 'pointer';
+    h.addEventListener('click', () => {
+      const block = h.closest('.day-block');
+      const [y,m,dd] = block.dataset.date.split('-').map(Number);
+      calSelectedDate = new Date(y, m-1, dd);
+      calRefDate = new Date(calSelectedDate);
+      calMode = 'day';
+      setCalModeButtons();
+      renderCalendar();
+    });
+  });
+}
+
+function renderDay(body, label){
+  const d = calRefDate;
+  label.textContent = `${GIORNI[d.getDay()]} ${d.getDate()} ${MESI[d.getMonth()]}`;
+  const evs = eventiDelGiorno(d);
+  calSelectedDate = new Date(d);
+
+  let html = evs.length
+    ? evs.map(renderEventCard).join('')
+    : '<div class="empty-hint">Nessun appuntamento per questo giorno. Tocca “+” per aggiungerne uno.</div>';
+  body.innerHTML = html;
+  attachEventDeleteHandlers(body);
+}
+
+function attachEventDeleteHandlers(scope){
+  scope.querySelectorAll('[data-del-event]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.delEvent;
+      eventi = eventi.filter(ev => ev.id !== id);
+      salvaEventi();
+      renderCalendar();
+    });
+  });
+}
+
+function setCalModeButtons(){
+  $$('.cal-switch button').forEach(b => b.classList.toggle('active', b.dataset.mode === calMode));
+}
+
+$$('.cal-switch button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    calMode = btn.dataset.mode;
+    setCalModeButtons();
+    renderCalendar();
+  });
+});
+
+$('#cal-prev').addEventListener('click', () => spostaCalendario(-1));
+$('#cal-next').addEventListener('click', () => spostaCalendario(1));
+
+function spostaCalendario(dir){
+  if(calMode === 'month'){
+    calRefDate = new Date(calRefDate.getFullYear(), calRefDate.getMonth()+dir, 1);
+  } else if(calMode === 'week'){
+    const d = new Date(calRefDate);
+    d.setDate(d.getDate() + dir*7);
+    calRefDate = d;
+  } else {
+    const d = new Date(calRefDate);
+    d.setDate(d.getDate() + dir);
+    calRefDate = d;
+  }
+  renderCalendar();
+}
+
+/* --- Modale nuovo evento --- */
+const eventModal = $('#event-modal');
+
+$('#fab-add-event').addEventListener('click', () => {
+  $('#ev-date').value = dateKey(calSelectedDate || new Date());
+  $('#ev-time').value = '09:00';
+  $('#ev-title').value = '';
+  $('#ev-mic-note').textContent = '';
+  eventModal.classList.remove('hidden');
+});
+$('#ev-cancel').addEventListener('click', () => eventModal.classList.add('hidden'));
+
+$('#ev-save').addEventListener('click', () => {
+  const data = $('#ev-date').value;
+  const ora = $('#ev-time').value;
+  const titolo = $('#ev-title').value.trim();
+  if(!data || !ora || !titolo){
+    alert('Compila data, ora e descrizione.');
+    return;
+  }
+  eventi.push({ id: uid(), date: data, time: ora, title: titolo });
+  salvaEventi();
+  eventModal.classList.add('hidden');
+  const [y,m,dd] = data.split('-').map(Number);
+  calRefDate = new Date(y, m-1, dd);
+  calSelectedDate = new Date(calRefDate);
+  renderCalendar();
+});
+
+attachVoiceInput($('#ev-mic'), $('#ev-mic-note'), (testo) => {
+  const campo = $('#ev-title');
+  campo.value = campo.value ? campo.value + ' ' + testo : testo;
+});
+
+/* =========================================================================
+   SEZIONE 2 — COSE DA FARE
+   ========================================================================= */
+
+let cose = JSON.parse(localStorage.getItem('agenda_cose') || '[]');
+// ogni voce: { id, text, done }
+
+function salvaCose(){
+  localStorage.setItem('agenda_cose', JSON.stringify(cose));
+}
+
+function renderCose(){
+  const list = $('#todo-list');
+  if(cose.length === 0){
+    list.innerHTML = '<div class="empty-hint">Il foglio è ancora bianco. Scrivi la prima cosa da fare.</div>';
+    return;
+  }
+  list.innerHTML = cose.map(c => `
+    <div class="todo-item ${c.done ? 'done' : ''}" data-id="${c.id}">
+      <input type="checkbox" ${c.done ? 'checked' : ''} data-toggle="${c.id}">
+      <div class="txt">${escapeHtml(c.text)}</div>
+      <button class="del" data-del-todo="${c.id}">✕</button>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('[data-toggle]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const item = cose.find(c => c.id === cb.dataset.toggle);
+      item.done = cb.checked;
+      salvaCose();
+      renderCose();
+    });
+  });
+  list.querySelectorAll('[data-del-todo]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      cose = cose.filter(c => c.id !== btn.dataset.delTodo);
+      salvaCose();
+      renderCose();
+    });
+  });
+}
+
+function aggiungiCosaDaFare(){
+  const input = $('#todo-input');
+  const testo = input.value.trim();
+  if(!testo) return;
+  cose.push({ id: uid(), text: testo, done: false });
+  salvaCose();
+  input.value = '';
+  renderCose();
+}
+
+$('#todo-add').addEventListener('click', aggiungiCosaDaFare);
+$('#todo-input').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') aggiungiCosaDaFare();
+});
+
+attachVoiceInput($('#todo-mic'), $('#todo-mic-note'), (testo) => {
+  $('#todo-input').value = testo;
+  aggiungiCosaDaFare();
+});
+
+/* =========================================================================
+   SEZIONE 3 — NOTE PRIVATE (cifrate con password)
+   ========================================================================= */
+
+// Chiavi in localStorage:
+//   private_salt        -> sale casuale (base64), generato una sola volta
+//   private_verifier     -> {iv, data} cifratura di una stringa nota, per
+//                            verificare che la password inserita sia corretta
+//   private_ciphertext   -> {iv, data} cifratura del contenuto reale delle note
+//
+// La password NON viene mai salvata: da essa si deriva ogni volta, tramite
+// PBKDF2, una chiave AES-GCM usata solo in memoria per la sessione corrente.
+
+let chiaveSessione = null; // CryptoKey, esiste solo mentre la sezione è sbloccata
+
+function bufToB64(buf){
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+function b64ToBuf(b64){
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+}
+
+async function derivaChiave(password, saltB64){
+  const salt = b64ToBuf(saltB64);
+  const encoder = new TextEncoder();
+  const materialeChiave = await crypto.subtle.importKey(
+    'raw', encoder.encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations:200000, hash:'SHA-256' },
+    materialeChiave,
+    { name:'AES-GCM', length:256 },
+    false,
+    ['encrypt','decrypt']
+  );
+}
+
+async function cifra(chiave, testoPiano){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoder = new TextEncoder();
+  const dati = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, chiave, encoder.encode(testoPiano));
+  return { iv: bufToB64(iv), data: bufToB64(dati) };
+}
+
+async function decifra(chiave, pacchetto){
+  const iv = new Uint8Array(b64ToBuf(pacchetto.iv));
+  const dati = b64ToBuf(pacchetto.data);
+  const risultato = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, chiave, dati);
+  return new TextDecoder().decode(risultato);
+}
+
+function haPasswordImpostata(){
+  return !!localStorage.getItem('private_salt');
+}
+
+// --- Interfaccia schermata di blocco ---
+const pwInput = $('#pw-input');
+const pwConfirm = $('#pw-confirm');
+const pwSubmit = $('#pw-submit');
+const lockError = $('#lock-error');
+const lockTitle = $('#lock-title');
+const lockDesc = $('#lock-desc');
+
+function aggiornaSchermataBlocco(){
+  if(haPasswordImpostata()){
+    lockTitle.textContent = 'Note private';
+    lockDesc.textContent = 'Inserisci la password per accedere alle tue note.';
+    pwConfirm.style.display = 'none';
+    pwSubmit.textContent = 'Sblocca';
+  } else {
+    lockTitle.textContent = 'Proteggi questa sezione';
+    lockDesc.textContent = 'Crea una password per proteggere questa sezione. Se la dimentichi, le note non potranno essere recuperate: conservala in un posto sicuro.';
+    pwConfirm.style.display = 'block';
+    pwSubmit.textContent = 'Crea password';
+  }
+  pwInput.value = '';
+  pwConfirm.value = '';
+  lockError.textContent = '';
+}
+
+pwSubmit.addEventListener('click', async () => {
+  lockError.textContent = '';
+  const password = pwInput.value;
+  if(!password){
+    lockError.textContent = 'Inserisci una password.';
+    return;
+  }
+
+  if(!haPasswordImpostata()){
+    // --- Creazione nuova password ---
+    if(password !== pwConfirm.value){
+      lockError.textContent = 'Le due password non coincidono.';
+      return;
+    }
+    if(password.length < 4){
+      lockError.textContent = 'Usa almeno 4 caratteri.';
+      return;
+    }
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const saltB64 = bufToB64(salt);
+    localStorage.setItem('private_salt', saltB64);
+
+    const chiave = await derivaChiave(password, saltB64);
+    const verifier = await cifra(chiave, 'OK');
+    localStorage.setItem('private_verifier', JSON.stringify(verifier));
+
+    const notaVuota = await cifra(chiave, '');
+    localStorage.setItem('private_ciphertext', JSON.stringify(notaVuota));
+
+    chiaveSessione = chiave;
+    entraInModalitaSbloccata('');
+  } else {
+    // --- Sblocco con password esistente ---
+    const saltB64 = localStorage.getItem('private_salt');
+    try{
+      const chiave = await derivaChiave(password, saltB64);
+      const verifier = JSON.parse(localStorage.getItem('private_verifier'));
+      const testoVerifica = await decifra(chiave, verifier); // lancia errore se sbagliata
+      if(testoVerifica !== 'OK') throw new Error('verifica fallita');
+
+      const pacchettoNote = JSON.parse(localStorage.getItem('private_ciphertext'));
+      const testoNote = await decifra(chiave, pacchettoNote);
+
+      chiaveSessione = chiave;
+      entraInModalitaSbloccata(testoNote);
+    } catch(err){
+      lockError.textContent = 'Password errata. Riprova.';
+    }
+  }
+});
+
+function entraInModalitaSbloccata(testo){
+  $('#lock-screen').style.display = 'none';
+  $('#private-unlocked').style.display = 'block';
+  $('#private-textarea').value = testo;
+  $('#private-status').textContent = 'Salvato';
+}
+
+function bloccaSezionePrivata(){
+  chiaveSessione = null;
+  $('#private-textarea').value = '';
+  $('#private-unlocked').style.display = 'none';
+  $('#lock-screen').style.display = 'flex';
+  aggiornaSchermataBlocco();
+}
+
+$('#private-lock').addEventListener('click', bloccaSezionePrivata);
+
+// --- Salvataggio automatico delle note (con breve debounce) ---
+let timerSalvataggio = null;
+$('#private-textarea').addEventListener('input', () => {
+  $('#private-status').textContent = 'Salvataggio…';
+  clearTimeout(timerSalvataggio);
+  timerSalvataggio = setTimeout(salvaNotePrivate, 600);
+});
+
+async function salvaNotePrivate(){
+  if(!chiaveSessione) return;
+  const testo = $('#private-textarea').value;
+  const pacchetto = await cifra(chiaveSessione, testo);
+  localStorage.setItem('private_ciphertext', JSON.stringify(pacchetto));
+  $('#private-status').textContent = 'Salvato';
+}
+
+attachVoiceInput($('#private-mic'), $('#private-mic-note'), (testo) => {
+  const area = $('#private-textarea');
+  area.value = area.value ? area.value + '\n' + testo : testo;
+  area.dispatchEvent(new Event('input'));
+});
+
+// --- Esportazione in PDF ---
+// Nota importante: il PDF generato NON è cifrato. Una volta esportato, il
+// contenuto è leggibile da chiunque apra il file. Usalo solo se sai dove
+// conservi il file esportato.
+$('#private-pdf').addEventListener('click', () => {
+  const testo = $('#private-textarea').value;
+  if(!testo.trim()){
+    alert('Non c’è ancora nulla da esportare.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const margine = 48;
+  const larghezzaUtile = doc.internal.pageSize.getWidth() - margine*2;
+  const altezzaPagina = doc.internal.pageSize.getHeight();
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text('Note private', margine, margine);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  const righe = doc.splitTextToSize(testo, larghezzaUtile);
+
+  let y = margine + 30;
+  const interlinea = 15;
+  righe.forEach(riga => {
+    if(y > altezzaPagina - margine){
+      doc.addPage();
+      y = margine;
+    }
+    doc.text(riga, margine, y);
+    y += interlinea;
+  });
+
+  doc.save('note-private.pdf');
+});
+
+/* =========================================================================
+   NAVIGAZIONE TRA SEZIONI (tab bar)
+   ========================================================================= */
+
+const titoliSezione = {
+  'calendar-section': ['La Mia Agenda', 'Calendario appuntamenti'],
+  'todo-section': ['Cose da fare', 'Il tuo foglio bianco'],
+  'private-section': ['Note private', 'Accesso protetto da password'],
+};
+
+$$('.tabbar button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.tabbar button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    $$('.view').forEach(v => v.classList.remove('active'));
+    $('#' + btn.dataset.target).classList.add('active');
+    const [t, sub] = titoliSezione[btn.dataset.target];
+    $('#section-title').textContent = t;
+    $('#section-subtitle').textContent = sub;
+  });
+});
+
+/* ---------- Avvio applicazione ---------- */
+setCalModeButtons();
+renderCalendar();
+renderCose();
+aggiornaSchermataBlocco();
+
+/* ═══════════════════════════════════════════════════════════════
+   REGISTRAZIONE SERVICE WORKER — necessario per funzionare come PWA
+   Il service worker permette l'uso OFFLINE e sblocca l'installazione
+   ═══════════════════════════════════════════════════════════════ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then((reg) => console.log('[PWA] Service Worker registrato:', reg.scope))
+      .catch((err) => console.warn('[PWA] Registrazione fallita:', err));
+  });
+}
+</script>
+</body>
+</html>
